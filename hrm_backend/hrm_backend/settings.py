@@ -148,7 +148,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'noreply@hrm-system.local'
 
 # Frontend URL for generating email links
-FRONTEND_URL = "http://localhost:5173"  # Default Vite port, change if needed
+FRONTEND_URL = "http://192.168.1.89:8080"  # Frontend application URL
 
 
 # CORS Configuration

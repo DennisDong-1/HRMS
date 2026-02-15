@@ -67,7 +67,13 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"], url_path="register/hr")
     def create_hr(self, request):
         serializer = HRRegistrationSerializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return api_response(
+                False,
+                "Validation failed",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
         user = serializer.save()
         return api_response(True, "HR created successfully", data=UserSerializer(user).data, status_code=status.HTTP_201_CREATED)
 
@@ -78,7 +84,13 @@ class UserViewSet(viewsets.ModelViewSet):
         tokenised link to set their password and activate their account.
         """
         serializer = EmployeeInviteSerializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return api_response(
+                False,
+                "Validation failed",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
         user = serializer.save()
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
