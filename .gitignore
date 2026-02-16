@@ -15,6 +15,8 @@ __pycache__/
 
 # Django / local dev files
 *.log
+*/db.sqlite3          # also covers it in subfolders like hrm_backend/
+*.sqlite3
 db.sqlite3
 media/
 staticfiles/
