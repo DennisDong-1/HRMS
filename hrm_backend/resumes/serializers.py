@@ -10,7 +10,7 @@ from .models import Resume
 class ResumeUploadSerializer(serializers.Serializer):
     """
     Handles the Resume Upload flow:
-    - Validate inputs (PDF only)
+    - Validate inputs (PDF or DOCX)
     - Create Candidate record if it does not exist for (email, job)
     - Create Resume record linked to Candidate and Job
     """
@@ -21,14 +21,20 @@ class ResumeUploadSerializer(serializers.Serializer):
     resume_file = serializers.FileField()
 
     def validate_resume_file(self, file):
-        # Simple PDF validation: check extension and (if present) the content-type.
         name = getattr(file, "name", "")
         content_type = getattr(file, "content_type", None)
 
-        if not name.lower().endswith(".pdf"):
-            raise serializers.ValidationError("Only PDF files are allowed.")
-        if content_type and content_type != "application/pdf":
-            raise serializers.ValidationError("Only PDF files are allowed.")
+        allowed_extensions = (".pdf", ".docx")
+        allowed_content_types = (
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+
+        ext = name.lower().rsplit(".", 1)[-1] if "." in name else ""
+        if not name.lower().endswith(allowed_extensions):
+            raise serializers.ValidationError("Only PDF and DOCX files are allowed.")
+        if content_type and content_type not in allowed_content_types:
+            raise serializers.ValidationError("Only PDF and DOCX files are allowed.")
         return file
 
     def validate_job_id(self, value: int) -> int:
@@ -85,6 +91,7 @@ class ResumeResultSerializer(serializers.ModelSerializer):
             "match_score",
             "decision",
             "screened_at",
+            "error_message",
         ]
         read_only_fields = fields
 
@@ -93,3 +100,36 @@ class ResumeResultSerializer(serializers.ModelSerializer):
         raw = obj.job.required_skills or ""
         return [s.strip() for s in raw.split(",") if s.strip()]
 
+
+class BatchUploadSerializer(serializers.Serializer):
+    """
+    Serializer for batch resume upload (multiple files for one job).
+    """
+    job_id = serializers.IntegerField()
+    resume_files = serializers.ListField(
+        child=serializers.FileField(),
+        allow_empty=False,
+    )
+    candidate_names = serializers.ListField(
+        child=serializers.CharField(max_length=255),
+        allow_empty=False,
+    )
+    candidate_emails = serializers.ListField(
+        child=serializers.EmailField(),
+        allow_empty=False,
+    )
+
+    def validate_job_id(self, value: int) -> int:
+        if not Job.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Invalid job_id. Job does not exist.")
+        return value
+
+    def validate(self, data):
+        files = data.get("resume_files", [])
+        names = data.get("candidate_names", [])
+        emails = data.get("candidate_emails", [])
+        if not (len(files) == len(names) == len(emails)):
+            raise serializers.ValidationError(
+                "resume_files, candidate_names, and candidate_emails must have the same length."
+            )
+        return data

@@ -38,6 +38,7 @@ class Resume(models.Model):
         max_length=20, choices=DECISION_CHOICES, null=True, blank=True
     )
     screened_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ["-screened_at", "-id"]
