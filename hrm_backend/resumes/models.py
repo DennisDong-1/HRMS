@@ -39,6 +39,7 @@ class Resume(models.Model):
     )
     screened_at = models.DateTimeField(null=True, blank=True)
     error_message = models.TextField(blank=True, default="")
+    ner_bonus = models.FloatField(default=0.0)  # Raw NER entity bonus component (0.0–1.0)
 
     class Meta:
         ordering = ["-screened_at", "-id"]

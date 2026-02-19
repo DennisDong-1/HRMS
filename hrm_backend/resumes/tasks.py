@@ -19,9 +19,9 @@ def screen_resume_task(self, resume_id: int):
 
     Steps:
       1. Load Resume (with related Candidate and Job).
-      2. Call run_ml_screening() from ml_inference.
-      3. Update Resume fields: match_score, extracted_skills, matched_skills,
-         decision, screened_at.
+      2. Call run_ml_screening() from ml_inference (three-signal hybrid).
+      3. Update Resume fields: match_score, ner_bonus, extracted_skills,
+         matched_skills, decision, screened_at, error_message.
       4. Update Candidate fields: match_score, status.
       5. On any exception, save the error message to Resume.error_message
          and re-raise so Celery can retry / mark as FAILURE.
@@ -39,13 +39,37 @@ def screen_resume_task(self, resume_id: int):
         return  # Nothing to retry — the record simply doesn't exist.
 
     try:
-        job_description = resume.job.description or ""
+        # Build a rich composite job context from all structured fields.
+        # This ensures the ML pipeline sees skills, experience, location, etc.
+        # — not just the free-text description.
+        job = resume.job
+        job_parts: list[str] = []
+
+        if job.title:
+            job_parts.append(f"Job Title: {job.title}")
+        if job.department:
+            job_parts.append(f"Department: {job.department}")
+        if job.location:
+            job_parts.append(f"Location: {job.location}")
+        if job.required_experience:
+            job_parts.append(f"Required Experience: {job.required_experience} years")
+        if job.required_skills:
+            # Normalize comma-separated skills into a readable sentence
+            skills_text = ", ".join(
+                s.strip() for s in job.required_skills.split(",") if s.strip()
+            )
+            job_parts.append(f"Required Skills: {skills_text}")
+        if job.description:
+            job_parts.append(job.description)
+
+        job_description = "\n".join(job_parts)
         resume_path = resume.resume_file.path  # absolute filesystem path
 
         result = run_ml_screening(resume_path, job_description)
 
         # --- Update Resume ---
         resume.match_score = result["score"]
+        resume.ner_bonus = result["ner_bonus"]
         resume.extracted_skills = result["extracted_skills"]
         resume.matched_skills = result["matched_skills"]
         resume.decision = result["decision"]
@@ -54,6 +78,7 @@ def screen_resume_task(self, resume_id: int):
         resume.save(
             update_fields=[
                 "match_score",
+                "ner_bonus",
                 "extracted_skills",
                 "matched_skills",
                 "decision",
@@ -69,9 +94,13 @@ def screen_resume_task(self, resume_id: int):
         candidate.save(update_fields=["match_score", "status"])
 
         logger.info(
-            "screen_resume_task completed for resume_id=%s: score=%.2f decision=%s",
+            "screen_resume_task completed for resume_id=%s | "
+            "FINAL=%.2f | embedding=%.2f | skill=%.2f | ner_bonus=%.4f | %s",
             resume_id,
             result["score"],
+            result["embedding_score"],
+            result["skill_score"],
+            result["ner_bonus"],
             result["decision"],
         )
 

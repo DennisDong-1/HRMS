@@ -89,6 +89,7 @@ class ResumeResultSerializer(serializers.ModelSerializer):
             "extracted_skills",
             "matched_skills",
             "match_score",
+            "ner_bonus",
             "decision",
             "screened_at",
             "error_message",
