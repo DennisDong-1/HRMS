@@ -30,10 +30,10 @@ class CandidateSerializer(serializers.ModelSerializer):
 
     def validate_resume_path(self, value: str) -> str:
         """
-        Ensure the resume is a PDF file based on its path or filename.
+        Ensure the resume is a PDF or DOCX file based on its path or filename.
         """
-        if not value.lower().endswith(".pdf"):
-            raise serializers.ValidationError("Only PDF resumes are allowed.")
+        if not value.lower().endswith((".pdf", ".docx")):
+            raise serializers.ValidationError("Only PDF or DOCX resumes are allowed.")
         return value
 
     def validate_match_score(self, value):
